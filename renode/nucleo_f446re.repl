@@ -1,0 +1,15 @@
+using "platforms/cpus/stm32f4.repl"
+
+UserLED: Miscellaneous.LED @ gpioPortA 5
+
+gpioPortA:
+    5 -> UserLED@0
+
+UserButton: Miscellaneous.Button @ gpioPortC 13
+    -> gpioPortC@13
+
+flash:
+    size: 0x80000
+
+sram:
+    size: 0x20000
