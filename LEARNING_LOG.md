@@ -25,10 +25,18 @@
 
 - .repl file: It is used to make adjustments, add devices, and change existing ones in your generic chip in Renode. The generic chip came from the first line with the "using" keyword. We created a UserLED peripheral at pin 5 of gpioPortA, then connected the output of pin 5 to that input of the UserLED we created. After that we created a UserButton at pin 13 of gpioPortC, then connected its output to the input of the same pin 13 of PortC. At last we adjusted the sram and flash values to be the same as the real F446RE, so Renode will warn if the firmware uses more memory than the real chip has.
 
-
 ## Renode vs. real hardware
 
 - Generic STM32F4 has 2 MB flash / 256 KB RAM; F446RE has 512 KB / 128 KB.
   Overridden in the .repl. Out-of-range access in Renode logs a warning,
   while real silicon would fault.
 - No GUI on macOS build; using console mode.
+
+
+
+## 2026-10-06: Logic analyzer test
+
+- Analyzer detected in PulseView as "Saleae Logic" with the fx2lafw driver.
+- Pin labels CH1–CH8 map to PulseView D0–D7 (CH1 = D0).
+- Grounding each channel shows a flat low; all 8 channels work.
+- Unconnected inputs read high on this analyzer, but floating inputs are undefined.
