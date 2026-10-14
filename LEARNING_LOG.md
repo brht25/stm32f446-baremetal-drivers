@@ -70,7 +70,7 @@
 - RM0390 memory map: RCC base address is 0x4002 3800, GPIOA base address is 0x4002 0000, GPIOA is on the AHB1 bus.
 - RM0390 RCC_AHB1ENR: AHB1ENR 's offset is 0x30. and its full address is 0x4002 3830. reset value is 0x0000 0000. GPIOA is on bit 0. 
 - RM0390 RCC_AHB1RSTR: It is the reset register. so it would reset the GPIOA if I would set bit 0 to high.
-- RM0390 GPIOx_ODR: offset is 0x14. full address is 0x4002 0014. bits 31:16 is reserved.Bits 15:0 = one per bit.
+- RM0390 GPIOx_ODR: offset is 0x14. full address is 0x4002 0014. bits 31:16 is reserved.Bits 15:0 = one per pin.
 - RM0390 GPIOx_BSRR: its offset is 0x18. full adress is 0x4002 0018. writing 0 does nothing and any read returns 0. 15:0 are set bits. 31:16 are reset bits. 
 - UM1724 LD2: It is on when pa5 is high, and off when pa5 is low. 
 
@@ -96,4 +96,41 @@
 4. busy wait
 5. GPIOA_BSRR = bit 21     → LED off
 6. busy wait
+
+## 2026-10-14: GPIO register struct layout and compile-time offset checks
+
+### Checked in the docs
+- RM0390 §7.4.11 GPIO register map: MODER 0x00, OTYPER 0x04, OSPEEDR 0x08, PUPDR 0x0C,
+  IDR 0x10, ODR 0x14, BSRR 0x18, LCKR 0x1C, AFRL 0x20, AFRH 0x24. All 32 bit.
+  Offsets go up by 4 each time, no gaps.
+
+### What broke
+- VS Code build task on offset_test.c: `Undefined symbols for architecture arm64: "_main"`,
+  `ld: symbol(s) not found`.
+- Cause: the task used the Mac's gcc, which builds for Apple Silicon, and went to the
+  linking step (ld = linker). Linking needs a main.
+- Fix: `arm-none-eabi-gcc -mcpu=cortex-m4 -mthumb -O1 -S -o - offset_test.c`. Builds for
+  Cortex-M4 instead of Apple Silicon. -S stops after generating assembly, before linking,
+  so it doesn't need main.
+
+### Learned
+- Struct member offsets: first member sits at the start point, the rest come after in
+  declaration order. Offset = total bytes of the members before it.
+  ODR: MODER, OTYPER, OSPEEDR, PUPDR, IDR = 20 bytes = 0x14.
+- Decided at compile time: `p->DATA` compiled to `ldr r0, [r0, #16]`. The 16 is the
+  bytes before DATA, written into the instruction by the compiler.
+- Reserved address range between registers: needs a filler member, so the offsets after it
+  won't be wrong. 8-byte gap: `uint8_t reserved0[8]` or `uint32_t reserved0[2]`
+  (8 uint8_t and 2 uint32_t both fill 8 bytes).
+- uint64_t should not be used as filler: it needs an address that is a multiple of 8, and
+  that sometimes causes the compiler to add padding.
+- Reserved bits inside a register (ODR 31:16): no filler, the uint32_t member covers them
+  already. GPIOA has no gaps, so no filler needed.
+- offsetof check: check every member, not only the last one. An order mistake (OTYPER and
+  OSPEEDR swapped) still gives AFRH 0x24, no error, things break silently.
+  Expected values come from RM0390, not from the struct.
+- _Static_assert: checked at compile time, if it fails the build is not done. Better than
+  a runtime check for now: no UART yet, so a runtime failure couldn't be printed.
+  Test: RESERVED0[2] → [3] = 4 more bytes, DATA moved to 0x14 →
+  `static assertion failed: "DATA offset wrong"`.
 
