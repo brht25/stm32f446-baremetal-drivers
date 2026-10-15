@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/berhat/Desktop/embedded/stm32f446-baremetal-drivers/blink_test/output/main'
+relocations:     []
+...
