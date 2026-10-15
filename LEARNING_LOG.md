@@ -134,3 +134,27 @@
   Test: RESERVED0[2] → [3] = 4 more bytes, DATA moved to 0x14 →
   `static assertion failed: "DATA offset wrong"`.
 
+## 2026-10-15: GPIO register struct header in the repo
+
+### What broke
+- First check of `blink_test/gpio.h`: warning `unnamed struct/union that defines no
+  instances` on `} GPIO;`, and on every `_Static_assert`:
+  `expected specifier-qualifier-list before ',' token`,
+  `expression in static assertion is not an integer`.
+- Cause: the include guard was `#define GPIO`, same name as the struct. Empty
+  replacement, so nothing sees GPIO as a type: the struct has no name and offsetof
+  gets no type.
+- Fix: renamed the guard to `GPIO_H` and the struct to `gpio_regs`. Continuing with
+  that pattern.
+
+### Learned
+- Struct goes in a .h: .c files can't access other .c files at compile time, but can
+  access header files. The compiler needs the offset for the instruction (ODR = 20).
+- One general struct for all GPIO ports; a base address per port comes later.
+- offsetof: some toolchains have it through stdio.h, others don't. It compiled with
+  only stdio.h in the ARM toolchain. To make sure, include stddef.h. Removed stdio.h
+  (no printf here).
+- Include guard test: removed the guard, included gpio.h twice in main.c →
+  `conflicting types for 'gpio_regs'`, the struct was defined two times. With the
+  guard: GPIO_H is already defined from the first include, so #ifndef skips the file
+  the second time.
